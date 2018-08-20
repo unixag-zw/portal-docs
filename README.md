@@ -14,11 +14,11 @@ apt install cron-apt
 
 Die Defaultkonfig von cron-apt lädt die Updates nur herunter, installiert sie aber nicht automatisch. Das ändern wir, indem wir die folgenden beiden Dateien entsprechend anpassen.
 
-1. /etc/cron-apt/action.d/0-update
+1. `/etc/cron-apt/action.d/0-update`
 ```bash
 update -o quiet=2
 ```
-2. /etc/cron-apt/action.d/3-download
+2. `/etc/cron-apt/action.d/3-download`
 ```bash
 autoclean -y
 dist-upgrade -y -o APT::Get::Show-Upgraded=true
@@ -95,7 +95,7 @@ sudo curl -L https://github.com/docker/compose/releases/download/1.22.0/docker-c
 sudo chmod +x /usr/local/bin/docker-compose
 ```
 
-# Der Aufbau unserer Docker Engine
+## Der Aufbau unserer Docker Engine
 
 Die UnixAG organisiert Dienste auf Portal mit Stacks. Deren Konfiguration wird unter `/etc/stacks/` in einem eigenen Ordern für jeden Dienst gespeichert.
 
@@ -115,79 +115,79 @@ $ tree /etc/stacks/gitlab/
 ```
 
 Die docker-compose.yml wird nachfolgend aufgestückelt und erklärt.
-## Eine typische docker-compose.yml
+### Eine typische docker-compose.yml
 
-1. ```yaml
+```yaml
 version: "3.6"
 ```
-  Die Version der Docker-Compose-/Docker-Stack-Spezikation. `3.6` ist für Herbst 2018 die aktuelle Spezifikation.
+Die Version der Docker-Compose-/Docker-Stack-Spezikation. `3.6` ist für Herbst 2018 die aktuelle Spezifikation.
 
-1. ```yaml
+```yaml
 services:
   gitlab:
     image: gitlab/gitlab-ce:latest
 ```
   Das Image wird mit dem Link auf das (hub.docker.com/)[Docker Hub] und der Verionsnummer angegeben. `latest` holt stets die neueste Version des Images.
 
-1. ```yaml
+```yaml
     volumes:
       - /srv/gitlab/config:/etc/gitlab
       - /srv/gitlab/logs:/var/log/gitlab
       - /srv/gitlab/data:/var/opt/gitlab
 ```
-  Hier stehen Dateien und Ordern, die vom Host auf den Container gemappt werden sollen. Sämtliche persistenten Daten müssen/sollten hier angegeben sein. Ansonsten werden die Daten bei Neuerstellung des Containers gelöscht. Die UnixAG verwendet hierfür den Ordner `/srv/`, in dem für jeden Dienst analog zum Ordner in `/etc/stacks/` ein Ordner für persistente Daten angelegt wird.
+Hier stehen Dateien und Ordern, die vom Host auf den Container gemappt werden sollen. Sämtliche persistenten Daten müssen/sollten hier angegeben sein. Ansonsten werden die Daten bei Neuerstellung des Containers gelöscht. Die UnixAG verwendet hierfür den Ordner `/srv/`, in dem für jeden Dienst analog zum Ordner in `/etc/stacks/` ein Ordner für persistente Daten angelegt wird.
 
-1. ```yaml
+```yaml
     ports:
       - "9901:80"
       - "2222:22"
 ```
-  Dieser Abschnitt beschreibt, welche Ports vom Container nach außen durchgereicht werden sollen. Sämtliche Webdienste sollten HTTP verwenden (keinesfalls HTTPS! (Erklärung in späterem Abschnitt)) und nach außen auf Port 80 verfügbar sein. Der interne Port 80 ist zudem von außen über den Port 9901 und der Port 22 über 2222 erreichbar. Die Reihenfolge in der Portangabe hierzu lautet `HOST:CONTAINER`!
+Dieser Abschnitt beschreibt, welche Ports vom Container nach außen durchgereicht werden sollen. Sämtliche Webdienste sollten HTTP verwenden (keinesfalls HTTPS! (Erklärung in späterem Abschnitt)) und nach außen auf Port 80 verfügbar sein. Der interne Port 80 ist zudem von außen über den Port 9901 und der Port 22 über 2222 erreichbar. Die Reihenfolge in der Portangabe hierzu lautet `HOST:CONTAINER`!
 
-1. ```yaml
+```yaml
     deploy:
       restart_policy:
         condition: any
 ```
-  Somit wird der Container bei Absturz stets neu hochgefahren, sehr empfehlenswerte Einstellung.
+Somit wird der Container bei Absturz stets neu hochgefahren, sehr empfehlenswerte Einstellung.
 
-1. ```yaml
+```yaml
       resources:
         limits:
           memory: 4g
 ```
-  Beschränkt den verfügbaren Arbeitsspeicher auf maximal 4GB. Man kann Mindestzuweisungen und Maximalwerte sowohl für RAM als auch CPU eintragen. Zumindest für RAM sollte eine Obergrenze eingetragen sein. RAM-Untergrenze und Werte für CPU sind wünschenswert, aber optional.
+Beschränkt den verfügbaren Arbeitsspeicher auf maximal 4GB. Man kann Mindestzuweisungen und Maximalwerte sowohl für RAM als auch CPU eintragen. Zumindest für RAM sollte eine Obergrenze eingetragen sein. RAM-Untergrenze und Werte für CPU sind wünschenswert, aber optional.
 
-1. ```yaml
+```yaml
     environment:
       - VIRTUAL_HOST=portal.unixag.net
       - VIRTUAL_PORT=80
       - LETSENCRYPT_EMAIL=sprecher@unixag.net
       - LETSENCRYPT_HOST=portal.unixag.net
 ```
-  Hiermit werden Umgebungsvariablen für den Container definiert. Mit Ihnen wird es möglich, ein HTTP-Interface (Website etc.) nach außen hin über eine frei wählbare Domain abrufbar zu machen. Dabei wird ein SSL Zertifikat generiert und von einem internen Proxy des Portal eine HTTPS-Anfrage von außen als HTTP-Anfrage an den Container durchgeschleift.
-  1. `VIRTUAL_HOST`<br>
-    Bewirkt, dass unter der dort angegebenen Domain der Container von außen per HTTPS erreichbar ist.
-  1. `VIRTUAL_PORT`<br>
-    Setzt den *Container-internen* Port fest, auf dem bei Zugriff auf obige Domain weitergeleitet wird.
-  1. `LETSENCRYPT_EMAIL`<br>
-    Setzt die Ansprechadresse für das Let`s Encrypt SSL-Zertifikat.
-  1. `LETSENCRYPT_HOST`<br> 
-    Muss gleich dem Wert von `VITUAL_HOST` gesetzt werden. Bestimmt die Domain für das SSL-Zertifikat.
+Hiermit werden Umgebungsvariablen für den Container definiert. Mit Ihnen wird es möglich, ein HTTP-Interface (Website etc.) nach außen hin über eine frei wählbare Domain abrufbar zu machen. Dabei wird ein SSL Zertifikat generiert und von einem internen Proxy des Portal eine HTTPS-Anfrage von außen als HTTP-Anfrage an den Container durchgeschleift.
+1. `VIRTUAL_HOST`<br>
+  Bewirkt, dass unter der dort angegebenen Domain der Container von außen per HTTPS erreichbar ist.
+1. `VIRTUAL_PORT`<br>
+  Setzt den *Container-internen* Port fest, auf dem bei Zugriff auf obige Domain weitergeleitet wird.
+1. `LETSENCRYPT_EMAIL`<br>
+  Setzt die Ansprechadresse für das Let's Encrypt SSL-Zertifikat.
+1. `LETSENCRYPT_HOST`<br>
+  Muss gleich dem Wert von `VITUAL_HOST` gesetzt werden. Bestimmt die Domain für das SSL-Zertifikat.
 
-1. ```yml
+```yml
 networks:
   default:
     external:
       name: nginx-proxy_default
 ```
-  Diese Einstellunen ermöglichen die Weiterleitung von Anfragen an den Proxy auf die konkreten Container.
+Diese Einstellunen ermöglichen die Weiterleitung von Anfragen an den Proxy auf die konkreten Container.
 
 Damit die Proxy-spezifischen Einstellungen auch greifen können, müssen die nachfolgend beschriebenen Container existieren.
 
-## Notwendige Container
+### Notwendige Container
 
-## Proxy und SSL-Zertifikat-Generator
+#### Proxy und SSL-Zertifikat-Generator
 
 Der Proxy wird unter `/etc/stacks/proxy` konfiguriert, daher sollen hier nur die Grundlagen erklärt werden.
 
@@ -198,3 +198,25 @@ Als Catchall für alle Anfragen ohne passenden Dienst mit entsprechender Domain,
 Das Image für die Zertifikatsgenerierung (sog. Proxy-Companion) ist in der docker-compose.yml des Proxy eingefügt.
 
 Der Proxy und der Proxy-Companion benötigen umfangreichen Zugriff auf Dateien des Hostsystems, um die Konfiguration und die Zertifikate generieren zu können. Der Proxy ist der einzige Dienst, der Zugriff auf Dateien außerhalb seines Ordner in `/srv/nginx-proxy` haben darf und muss.
+
+#### LDAP
+
+Unsere OpenLDAP Installation wird vollständig über die `docker-compose.yml` unter `/etc/stacks/ldap/` konfiguriert. Die korrekten Werte sind dort einsehbar, aus Sicherheitsgründen jedoch nicht hier aufgeführt.
+
+Um das LDAP zu administrieren gibt es einen PHPLDAPadmin Container, der in der ebenfalls in der `docker-compose.yml` unter `/etc/stacks/ldap/` konfiguriert ist. Momentan ist der PHPLDAPadmin nur über den in der YAML-Datei angegebenenen Port erreichbar und nicht über eine Subdomain von unixag.net. Die Subdomain ldap.unixag.net ist aktuell an den LDAP Service und nicht an PHPLDAPadmin gebunden. Ob es möglich ist, die Subdomain stattdessem bei PHPLDAPadmin einzutragen, müsste man ausprobieren. Falls es dann Zugriffsprobleme geben sollte, kann die Subdomain phpldapadmin.unixag.net eingerichtet werden.
+
+#### Catchall
+
+Portal kann als Catchall für \*.unixag.net dienen, aktuell ist dort allerdings die IP vom Tetris, unserem Frankenwebserver, eingetragen.
+Aber für Subdomains, die auf IP vom Portal `192.168.1.240` zeigen und für die keine Container für die Proxy-Weiterleitung eingerichtet ist, braucht Portal schon jetzt einen Catchall-Webserver. Dazu dient ein einfacher Nginx mit einer statischem .html-Seite. Als `VIRTUAL_HOST` ist hier `_` (Underscore) eingetragen. Da auf dem Proxy als Alias für den Catchall (unter der Umgebungsvariable `DEFAULT_HOST`) ebenfalls `_` (Underscore) eingetragen ist, werden sämtliche Anfragen ohne passenden Container an den Catchall weitergeleitet.
+
+## Tipps und Tricks
+
+### GitLab Unicorn-Worker
+
+GitLab erzeugt für nebenläufige Aufgaben sog. Unicorn-Worker-Prozesse. Allerdings werden diese Prozesse nicht immer ordentlich beendet und fressen daher mitunter große Mengen Arbeitsspeicher. In der standardmäßig generierten Konfiguration für GitLab kann man eine Höchstanzahl für Unicorn-Worker und einen Timeout für die Prozesse festlegen. Diese Einstellungen liegen unter `/srv/{name-des-stacks}/config/gitlab.rb`:
+```ruby
+unicorn['worker_timeout'] = 60
+unicorn['worker_processes'] = 5
+```
+Mit den eingetragenen Werten haben wir eine deutlich stabilere GitLab-Instanz erhalten, die zudem noch weniger RAM verbraucht. Die Variablen stehen (noch auskommentiert, aber vorgeneriert) in der Datei etwa ab Zeile 630.
