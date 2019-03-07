@@ -4,50 +4,41 @@
 
 Diese Dokumentation geht von einer akutellen Debian-Installation mit Minimalkonfiguration aus.
 
+### RAID
+
+![RAID 1 Konfiguration](./assets/raid_partitioning.png)
+
+- 2 Partitionen (eine je Festplatte) in identischer Größe mit `msdos` Partitionsschema anlegen und für die Verwendung im RAID vormerken.
+- RAID 1 mit beiden Partitionen anlegen.
+- Guided Partitioning verwenden, um die root-Partition unter `/` und den Swap automatisch auf dem RAID anzulegen.
+
 ### Automatische Updates
-
-Um Updates automatisch zu beziehen, verwenden wir `cron-apt`.
-
-```bash
-apt install cron-apt
-```
-
-Die Defaultkonfig von cron-apt lädt die Updates nur herunter, installiert sie aber nicht automatisch. Das ändern wir, indem wir die folgenden beiden Dateien entsprechend anpassen.
-
-1. `/etc/cron-apt/action.d/0-update`
-```bash
-update -o quiet=2
-```
-2. `/etc/cron-apt/action.d/3-download`
-```bash
-autoclean -y
-dist-upgrade -y -o APT::Get::Show-Upgraded=true
-```
-
-Mit dieser Konfiguration sind auch Distupgrades automatisiert.
-
-### Mehr Sicherheit!
-
-Um das System vor unbefugtem Zugriff zu schützen, empfiehlt es sich, fail2ban zu installieren.
-
-```bash
-sudo apt install fail2ban
-```
-
-Falls die Konfiguration angepasst werden soll (Fehlversuche beim Login bis zum Block, Block-Dauer etc), dann muss dies in `/etc/fail2ban/jail.local` erfolgen. Als Basis dafür kann man die Defaultkonfig /etc`/fail2ban/jail.conf` nutzen.
-
-```bash
-sudo cp /etc/fail2ban/jail.conf /etc/fail2ban/jail.local
-```
-
-### Docker installieren
 
 Zuerst holen wir uns die neuesten Paketquellen.
 ```bash
 sudo apt update
 ```
+Um Updates automatisch zu beziehen, verwenden wir `cron-apt`.
 
-Dann installieren wir Tools um mit apt auch über HTTPS Pakete laden zu können.
+```bash
+sudo apt install cron-apt
+```
+
+Die Standardkonfiguration von `cron-apt` lädt die Updates nur herunter, installiert sie aber nicht automatisch. Das ändern wir, indem wir die folgenden beiden Dateien entsprechend anpassen.
+
+1. `/etc/cron-apt/action.d/0-update`
+```bash
+sudo bash -c 'echo "update -o quiet=2" > /etc/cron-apt/action.d/0-update'
+```
+2. `/etc/cron-apt/action.d/3-download`
+```bash
+sudo bash -c 'printf "autoclean -y\ndist-upgrade -y -o APT::Get::Show-Upgraded=true" > /etc/cron-apt/action.d/3-download'
+```
+
+Mit dieser Konfiguration sind auch Distupgrades automatisiert.
+
+### Mehr Sicherheit!
+Wir installieren Tools, um mit `apt` auch über HTTPS Pakete laden zu können.
 
 ```bash
 sudo apt install \
@@ -58,9 +49,44 @@ sudo apt install \
      software-properties-common
 ```
 
+Dann müssen die Paketquellen angepasst werden. Hierzu wird `/etc/apt/sources.list` bearbeitet:
+```bash
+sudo bash -c 'sed "s/http:/https:/" -i /etc/apt/sources.list'
+```
+
+Zudem müssen die folgenden Zeilen auskommentiert werden - `security.debian.org` unterstützt HTTPS nicht.
+```
+deb https://security.debian.org/debian-security stretch/updates main contrib non-free
+deb-src https://security.debian.org/debian-security stretch/updates main contrib non-free
+```
+
+Um das System vor unbefugtem Zugriff zu schützen, empfiehlt es sich, `fail2ban` zu installieren.
+
+```bash
+sudo apt install fail2ban
+```
+
+Falls die Konfiguration angepasst werden soll (Fehlversuche beim Login bis zum Block, Block-Dauer etc), dann muss dies in `/etc/fail2ban/jail.local` erfolgen. Als Basis dafür kann man die Standardkonfiguration /etc`/fail2ban/jail.conf` nutzen.
+
+```bash
+sudo cp /etc/fail2ban/jail.conf /etc/fail2ban/jail.local
+```
+
+### Nützliche Software installieren
+```
+sudo apt install curl wget vim zsh fish htop iftop iotop grc git jq pv tree
+curl -LO https://github.com/BurntSushi/ripgrep/releases/download/0.10.0/ripgrep_0.10.0_amd64.deb
+sudo dpkg -i ripgrep_0.10.0_amd64.deb
+curl -LO https://github.com/sharkdp/fd/releases/download/v7.3.0/fd_7.3.0_amd64.deb
+sudo dpkg -i fd_7.3.0_amd64.deb
+```
+
+### Docker installieren
+
 Wir laden den GPG Key und überprüfen den Fingerprint. Der Fingerprint sollte auf `9DC8 5822 9FC7 DD38 854A E2D8 8D81 803C 0EBF CD88` lauten, falls sich der Fingerprint ändert, kann er unter der [https://docs.docker.com/install/linux/docker-ce/debian/#set-up-the-repository](Docker Installationsanleitung) nachgeschlagen werden.
 
 ```bash
+curl -fsSL https://download.docker.com/linux/debian/gpg | sudo apt-key add -curl -fsSL https://download.docker.com/linux/debian/gpg | sudo apt-key add -
 sudo apt-key fingerprint 0EBFCD88
 ```
 
@@ -119,6 +145,36 @@ Die docker-compose.yml wird nachfolgend aufgestückelt und erklärt.
 
 ```yaml
 version: "3.6"
+services:
+  gitlab:
+    image: gitlab/gitlab-ce:latest
+    volumes:
+      - /srv/gitlab/config:/etc/gitlab
+      - /srv/gitlab/logs:/var/log/gitlab
+      - /srv/gitlab/data:/var/opt/gitlab
+    ports:
+      - "9901:80"
+      - "2222:22"
+    deploy:
+      restart_policy:
+        condition: any
+      resources:
+        limits:
+          memory: 4g
+    environment:
+      - VIRTUAL_HOST=portal.unixag.net
+      - VIRTUAL_PORT=80
+      - LETSENCRYPT_EMAIL=sprecher@unixag.net
+      - LETSENCRYPT_HOST=portal.unixag.net
+networks:
+  default:
+    external:
+      name: nginx-proxy_default
+```
+
+Nachfolgend wird diese `docker-compose.yml` abschnittsweise erklärt.
+```yaml
+version: "3.6"
 ```
 Die Version der Docker-Compose-/Docker-Stack-Spezikation. `3.6` ist für Herbst 2018 die aktuelle Spezifikation.
 
@@ -175,7 +231,7 @@ Hiermit werden Umgebungsvariablen für den Container definiert. Mit Ihnen wird e
 1. `LETSENCRYPT_HOST`<br>
   Muss gleich dem Wert von `VITUAL_HOST` gesetzt werden. Bestimmt die Domain für das SSL-Zertifikat.
 
-```yml
+```yaml
 networks:
   default:
     external:
