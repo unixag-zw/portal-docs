@@ -123,18 +123,17 @@ sudo chmod +x /usr/local/bin/docker-compose
 
 ## Der Aufbau unserer Docker Engine
 
-Die UnixAG organisiert Dienste auf Portal mit Stacks. Deren Konfiguration wird unter `/etc/stacks/` in einem eigenen Ordern für jeden Dienst gespeichert.
+Die UnixAG organisiert Dienste auf Portal mit Stacks. Deren Konfiguration wird unter `/etc/portal/stacks-available/` in einem eigenen Ordern für jeden Dienst gespeichert. Aktive Stacks werden automatisiert (siehe Abschnitt zu `portal` CLI) nach `/etc/portal/stacks-enables/` gelinkt. Custom Images werden in `/etc/portal/images/` zentral gespeichert.
 
 ```bash
-mkdir /etc/stacks
+mkdir -p /etc/portal/stacks-available /etc/portal/stacks-enabled /etc/portal/images
 ```
 
-Ein Ordner unter `/etc/stacks/`, wie zB `/etc/stacks/gitlab/` für die GitLab-Instanz der UnixAG, beinhalten mindestens eine `deploy.sh` Datei, die als kurzes Skript den Dienst, der im jeweiligen Ordner konfiguriert ist, ausrollt, und eine `docker-compose.yml`, die die notwendigen Container und deren Konfiguration beschreiben.
+Ein Ordner unter `/etc/portal/stacks-available/`, wie zB `/etc/portal/stacks-available/gitlab/` für die GitLab-Instanz der UnixAG, beinhaltet mindestens eine `docker-compose.yml`, die die notwendigen Container und deren Konfiguration beschreibt.
 
 ```bash
-$ tree /etc/stacks/gitlab/
-/etc/stacks/gitlab/
-├── deploy.sh
+$ tree /etc/portal/stacks-available/gitlab/
+/etc/portal/stacks-available/gitlab/
 └── docker-compose.yml
 
 0 directories, 2 files
@@ -191,7 +190,7 @@ services:
       - /srv/gitlab/logs:/var/log/gitlab
       - /srv/gitlab/data:/var/opt/gitlab
 ```
-Hier stehen Dateien und Ordern, die vom Host auf den Container gemappt werden sollen. Sämtliche persistenten Daten müssen/sollten hier angegeben sein. Ansonsten werden die Daten bei Neuerstellung des Containers gelöscht. Die UnixAG verwendet hierfür den Ordner `/srv/`, in dem für jeden Dienst analog zum Ordner in `/etc/stacks/` ein Ordner für persistente Daten angelegt wird.
+Hier stehen Dateien und Ordern, die vom Host auf den Container gemappt werden sollen. Sämtliche persistenten Daten müssen/sollten hier angegeben sein. Ansonsten werden die Daten bei Neuerstellung des Containers gelöscht. Portal verwendet hierfür den Ordner `/srv/`, in dem für jeden Dienst analog zum Ordner in `/etc/portal/stacks-available/` ein Ordner für persistente Daten angelegt werden muss.
 
 ```yaml
     ports:
@@ -245,11 +244,11 @@ Damit die Proxy-spezifischen Einstellungen auch greifen können, müssen die nac
 
 #### Proxy und SSL-Zertifikat-Generator
 
-Der Proxy wird unter `/etc/stacks/proxy` konfiguriert, daher sollen hier nur die Grundlagen erklärt werden.
+Der Proxy wird unter `/etc/portal/stacks-available/proxy` konfiguriert, daher sollen hier nur die Grundlagen erklärt werden.
 
 Proxy und Zertifikar-Generator stammen aus der Docker Community und sind weit verbreitete, praxiserprobte Images. Der Proxy nimmt Anfragen auf Port 80 (HTTP) und Port 443 (HTTPS) an, leitet bei Anfragen an Port 80 jedoch stets auf Port 443 weiter. Von da an entscheidet die vollautomatisch auf Basis der Umgebungsvariablen der Dienste generierte Konfiguration, welche Anfrage wohin umgeleitet wird.
 
-Als Catchall für alle Anfragen ohne passenden Dienst mit entsprechender Domain, dient der über `DEFAULT_HOST` definierte Name `_` (Unterstrich). Der Dienst unter `/etc/stacks/nginx-catchall` hat als Domain `_` eingetragen - somit dient dieser Dienst mit einer einfachen .html-Website als Catchall.
+Als Catchall für alle Anfragen ohne passenden Dienst mit entsprechender Domain, dient der über `DEFAULT_HOST` definierte Name `_` (Unterstrich). Der Dienst unter `/etc/portal/stacks-available/nginx-catchall` hat als Domain `_` eingetragen - somit dient dieser Dienst mit einer einfachen .html-Website als Catchall.
 
 Das Image für die Zertifikatsgenerierung (sog. Proxy-Companion) ist in der docker-compose.yml des Proxy eingefügt.
 
@@ -257,14 +256,91 @@ Der Proxy und der Proxy-Companion benötigen umfangreichen Zugriff auf Dateien d
 
 #### LDAP
 
-Unsere OpenLDAP Installation wird vollständig über die `docker-compose.yml` unter `/etc/stacks/ldap/` konfiguriert. Die korrekten Werte sind dort einsehbar, aus Sicherheitsgründen jedoch nicht hier aufgeführt.
+Unsere OpenLDAP Installation wird vollständig über die `docker-compose.yml` unter `/etc/portal/stacks-available/ldap/` konfiguriert. Die korrekten Werte sind dort einsehbar, aus Sicherheitsgründen jedoch nicht hier aufgeführt.
 
-Um das LDAP zu administrieren gibt es einen PHPLDAPadmin Container, der in der ebenfalls in der `docker-compose.yml` unter `/etc/stacks/ldap/` konfiguriert ist. Momentan ist der PHPLDAPadmin nur über den in der YAML-Datei angegebenenen Port erreichbar und nicht über eine Subdomain von unixag.net. Die Subdomain ldap.unixag.net ist aktuell an den LDAP Service und nicht an PHPLDAPadmin gebunden. Ob es möglich ist, die Subdomain stattdessem bei PHPLDAPadmin einzutragen, müsste man ausprobieren. Falls es dann Zugriffsprobleme geben sollte, kann die Subdomain phpldapadmin.unixag.net eingerichtet werden.
+Um das LDAP zu administrieren gibt es einen PHPLDAPadmin Container, der in der ebenfalls in der `docker-compose.yml` unter `/etc/portal/stacks-available/ldap/` konfiguriert ist. Momentan ist der PHPLDAPadmin nur über den in der YAML-Datei angegebenenen Port erreichbar und nicht über eine Subdomain von unixag.net. Die Subdomain ldap.unixag.net ist aktuell an den LDAP Service und nicht an PHPLDAPadmin gebunden. Ob es möglich ist, die Subdomain stattdessem bei PHPLDAPadmin einzutragen, müsste man ausprobieren. Falls es dann Zugriffsprobleme geben sollte, kann die Subdomain phpldapadmin.unixag.net eingerichtet werden.
 
 #### Catchall
 
 Portal kann als Catchall für \*.unixag.net dienen, aktuell ist dort allerdings die IP vom Tetris, unserem Frankenwebserver, eingetragen.
 Aber für Subdomains, die auf IP vom Portal `192.168.1.240` zeigen und für die keine Container für die Proxy-Weiterleitung eingerichtet ist, braucht Portal schon jetzt einen Catchall-Webserver. Dazu dient ein einfacher Nginx mit einer statischem .html-Seite. Als `VIRTUAL_HOST` ist hier `_` (Underscore) eingetragen. Da auf dem Proxy als Alias für den Catchall (unter der Umgebungsvariable `DEFAULT_HOST`) ebenfalls `_` (Underscore) eingetragen ist, werden sämtliche Anfragen ohne passenden Container an den Catchall weitergeleitet.
+
+## Das `portal` CLI
+
+Portal verfügt mit `portal` über ein eigenes CLI (command line interface), das die Administration des Portal-Servers automatisiert und vereinfacht.
+
+`portal` ist in Bash geschrieben und verfügt über insgesamt 6 Subcommands: `deploy`, `rm`, `build`, `startup`, `shutdown` und `ls`. Sämtliche dieser Subcommands sind idempotent.
+
+### `portal deploy`
+
+`portal deploy` ist einzige Befehl, mit dem Stacks auf Portal deployt werden.
+`portal deploy` nimmt als Parameter den Namen des Stacks an, also etwa `portal
+deploy nginx-proxy` oder `portal deploy gitlab`.
+
+Durch diesen Befehl wird (falls noch nicht vorhanden) ein Symlink von
+`/etc/portal/stacks-available/<stackname>` nach
+`/etc/portal/stacks-enabled/<stackname>` erzeugt. Durch diesen Symlink kann das
+`portal` CLI in `/etc/portal/stacks-enabled` gelinkte Stacks automatisiert
+ausrollen, etwa wenn der Server neu gestartet worden ist. Dieses Pattern ist
+angelehnt an die Funktionsweise von Apache2.4.
+
+Im nächsten Schritt wird der Stack dann deployt.
+
+### `portal rm`
+
+`portal rm` arbeitet analog zu `portal deploy`: Es entfernt den Symlink in `/etc/portal/stacks-enabled` und entfernt den angegebenen Stack.
+
+Weil der nginx-proxy für den Betrieb von Portal zwingend notwendig ist, kann nginx-proxy zwar mit `portal rm nginx-proxy` als Stack entfernt werden, aber der Symlink wird nicht gelöscht, sodass nginx-proxy weiterhin automatisch wieder ausgerollt werden kann.
+
+### `portal build`
+
+Wenn angepasste Images auf Portal verwendet werden, sollten diese in
+`/etc/portal/images/` angelegt und gepflegt werden. Dann nämlich kann `portal
+build <imagename>` das Image unter `/etc/portal/images/<imagename>` automatisch
+erzeugen und in die Registry von Portal hochladen.
+
+Ein Image namens `beispiel` hat sein Dockerfile (und optional weitere benötigte
+Dateien) dann im Ordner `/etc/portal/images/beispiel`, wird mit `portal build
+beispiel` gebaut und kann unter dem Namen `localhost:5000/unixag-zw/beispiel`
+in einer docker-compose.yml referenziert werden.
+
+Der Name `localhost:5000/unixag-zw/<imagename>` ergibt sich aus der Registry,
+aus der das Image geladen werden soll (per default ist das hub.docker.com). Das
+Präfix `unixag-zw` wird zudem eingesetzt, um namentliche Überschneidungen mit
+anderen Images zu verhindern.
+
+### `portal startup`
+
+`portal startup` ist der zentrale Befehl, um alle für den Betrieb von Portal notwendigen Container und Services in der richtigen Reihenfolge zu starten. Nachfolgend werden die einzelnen Schritte beschrieben, die dafür notwendig sind.
+
+1. Die Registry wird deployt.
+1. Sämtliche Images unter `/etc/portal/images` werden mit `portal build` gebaut und in die (zunächst leere) Registry geladen.
+1. nginx-proxy wird mit `portal deploy` deployt. Das muss vor allen anderen Stacks passieren, weil
+   andere Stacks sich auf das Vorhandensein des externen Netzwerks von
+   nginx-proxy verlassen können müssen.
+1. Alle weiteren Stacks werden mit `portal deploy` deployt.
+
+Die Images können dabei in beliebiger Reihenfolge gebaut und die Stacks in
+beliebiger Reihenfolge deployt werden. Kein Stack darf (mit Ausnahme von
+nginx-proxy) auf das Vorhandensein anderer Stacks angewiesen sein!
+
+Jeder der Schritte in `portal startup` ist idempotent.
+1. Es wird genau eine Registry deployt. Wenn bereits eine Registry deployt ist, wird der Container nicht neu gestartet.
+1. `portal build` ist idempotent, da bereits die darin verwendeten Befehle `docker build` und `docker push` idempotent sind.
+1. `portal deploy` ist ebenfalls idempotent, da `docker stack deploy` idempotent ist.
+
+### `portal shutdown`
+
+`portal shutdown` beendet sämtliche Services und Container, die vom `portal` CLI verwaltet werden.
+Hierzu wird zuerst die Registry entfernt. Danach werden sämtliche Stacks
+entfernt, wobei nginx-proxy Aufgrund seines externen Netzwerks als Letztes
+entfernt wird.
+
+### `portal ls`
+
+`portal ls` ist eine Komfortfunktion, die sämtliche Stacks in
+`/etc/portal/stacks/enabled` auflistet. Das sind zugleich sämtliche Stacks, die
+aktuell vom `portal` CLI verwaltet werden.
 
 ## Tipps und Tricks
 
